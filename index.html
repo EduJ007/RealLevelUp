@@ -11,7 +11,7 @@
 
 <div id="loading-screen">
     <div class="loader-container">
-        <div class="loader-title">CARREGANDO SUAS MISSÕES...</div>
+        <div class="loader-title">CONECTANDO AO SERVIDOR...</div>
         <div class="loader-bar-bg">
             <div id="loader-progress" class="loader-bar-fill"></div>
         </div>
@@ -22,14 +22,36 @@
     <div class="popup-box">
         <div class="popup-icon" id="popup-icon">❌</div>
         <h3 id="popup-title">Ação Bloqueada</h3>
-        <p id="popup-message">Você não tem moedas suficientes!</p>
-        <button class="btn-popup-close" onclick="closePopup()">Entendido</button>
+        <p id="popup-message">Mensagem de erro aqui.</p>
+        <button class="btn-popup-close" id="btn-popup-close">Entendido</button>
     </div>
 </div>
 
-<div class="container">
+<div id="auth-container" class="auth-screen hidden">
+    <div class="auth-box">
+        <h2 id="auth-title">🛡️ Acessar Guilda</h2>
+        <div class="input-group-auth">
+            <label>Seu Email de Herói</label>
+            <input type="email" id="auth-email" placeholder="exemplo@rpg.com">
+        </div>
+        <div class="input-group-auth">
+            <label>Sua Senha Secreta</label>
+            <input type="password" id="auth-password" placeholder="******">
+        </div>
+        
+        <div class="auth-buttons">
+            <button id="btn-login" class="btn-add">Entrar na Jornada</button>
+            <button id="btn-register" class="btn-shop">Criar Novo Herói</button>
+        </div>
+    </div>
+</div>
+
+<div id="game-container" class="container hidden">
     <div class="panel">
-        <h2>Status do Herói</h2>
+        <div class="panel-header">
+            <h2>Status do Herói</h2>
+            <button id="btn-logout" class="btn-logout" style="padding: 6px 12px; background: #ff5577; font-size: 0.8rem;">🚪 Sair</button>
+        </div>
         <div class="status-group">
             <div class="stats-text">
                 <span class="level-badge">LVL <span id="lbl-level">1</span></span>
@@ -57,14 +79,14 @@
                 <strong>Poção de XP Dobrado</strong>
                 <small>Próxima tarefa dá o dobro de XP</small>
             </div>
-            <button class="btn-shop" onclick="buyItem('doubleXp', 50)">Comprar (<span class="price">50🪙</span>)</button>
+            <button class="btn-shop" id="btn-buy-xp">Comprar (<span class="price">50🪙</span>)</button>
         </div>
         <div class="shop-item">
             <div>
                 <strong>Ampulheta do Tempo</strong>
                 <small>Adiciona +2 horas no prazo diário</small>
             </div>
-            <button class="btn-shop" onclick="buyItem('extraTime', 30)">Comprar (<span class="price">30🪙</span>)</button>
+            <button class="btn-shop" id="btn-buy-time">Comprar (<span class="price">30🪙</span>)</button>
         </div>
     </div>
 
@@ -78,12 +100,12 @@
         
         <div class="input-group">
             <input type="text" id="task-input" placeholder="Digite sua próxima missão...">
-            <button class="btn-add" onclick="addTask()">+ Aceitar</button>
+            <button class="btn-add" id="btn-add-task">+ Aceitar</button>
         </div>
         <ul id="task-list"></ul>
     </div>
 </div>
 
-<script src="index.js"></script>
+<script type="module" src="index.js"></script>
 </body>
 </html>
