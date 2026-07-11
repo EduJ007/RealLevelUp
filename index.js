@@ -1,4 +1,3 @@
-// IMPORTAÇÃO DOS MÓDULOS OFICIAIS DO FIREBASE
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
     getAuth, 
@@ -14,7 +13,6 @@ import {
     getDoc 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// SUAS CONFIGURAÇÕES FORNECIDAS DO FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyC6jf8HCB5LVOti0o2KcWqxNFm7c-T1HSk",
     authDomain: "levelup-a85ae.firebaseapp.com",
@@ -25,29 +23,49 @@ const firebaseConfig = {
     measurementId: "G-VDV7ZEJJS8"
 };
 
-// INICIALIZANDO OS SERVIÇOS
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ESTADO GLOBAL DO JOGADOR LOGADO
 let currentUser = null;
+let isRegisterMode = false; // Controle de tela Login / Cadastro
+
 let gameState = {
-    level: 1,
-    xp: 0,
-    xpNeeded: 100,
-    coins: 0,
-    tasks: [],
-    doubleXpActive: false,
-    extraHours: 0,
-    lastResetDate: ""
+    heroName: "Herói",
+    level: 1, xp: 0, xpNeeded: 100, coins: 0,
+    tasks: [], doubleXpActive: false, extraHours: 0, lastResetDate: "",
+    bonusCoinsLevelUp: 0,
+    history: {} // Armazena {"DD/MM/AAAA": totalConcluido}
 };
 
-// REGRA PADRÃO PARA INICIAR NOVOS CONTAS
 const INITIAL_STATE = {
+    heroName: "Herói",
     level: 1, xp: 0, xpNeeded: 100, coins: 0,
-    tasks: [], doubleXpActive: false, extraHours: 0, lastResetDate: ""
+    tasks: [], doubleXpActive: false, extraHours: 0, lastResetDate: "",
+    bonusCoinsLevelUp: 0,
+    history: {}
 };
+
+// TITULOS DE ACORDO COM O NÍVEL
+function getHeroTitle(level) {
+    if (level >= 25) return "🧙‍♂️ Mestre Supremo";
+    if (level >= 18) return "🔱 Cavaleiro Paladino";
+    if (level >= 12) return "⚔️ Guerreiro de Elite";
+    if (level >= 6) return "🏹 Caçador Veterano";
+    if (level >= 3) return "🛡️ Recruta Destemido";
+    return "🌱 Aprendiz da Guilda";
+}
+
+// GERA IMAGEM DE PERFIL DINÂMICA VIA EMAIL DO GRAVATAR (Identicon gamer se o e-mail não tiver cadastro lá)
+function getGravatarUrl(email) {
+    const cleanEmail = email.trim().toLowerCase();
+    // Função simples para gerar um hash numérico rápido para o avatar padrão
+    let hash = 0;
+    for (let i = 0; i < cleanEmail.length; i++) {
+        hash = cleanEmail.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return `https://www.gravatar.com/avatar/${Math.abs(hash)}?d=identicon&s=150`;
+}
 
 // POP-UP CUSTOMIZADO
 window.showPopup = function(type, title, message) {
@@ -81,33 +99,64 @@ window.closePopup = function() {
 }
 document.getElementById('btn-popup-close').addEventListener('click', closePopup);
 
-// SALVAR DADOS NA NUVEM (FIRESTORE)
+// GRAVAÇÃO E LEITURA CLOUD FIRESTORE
 async function saveGameProgress() {
     if (!currentUser) return;
     try {
         await setDoc(doc(db, "users", currentUser.uid), gameState);
     } catch (e) {
-        console.error("Erro ao salvar progresso na nuvem: ", e);
+        console.error("Erro ao salvar dados: ", e);
     }
 }
 
-// CARREGAR DADOS DA NUVEM (FIRESTORE)
 async function loadGameProgress(user) {
     const docRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
         gameState = docSnap.data();
+        if (!gameState.history) gameState.history = {};
+        if (!gameState.heroName) gameState.heroName = "Herói";
+        if (gameState.bonusCoinsLevelUp === undefined) gameState.bonusCoinsLevelUp = 0;
     } else {
-        // Se for um usuário novo sem documento no banco, cria o primeiro registro
         gameState = { ...INITIAL_STATE };
+        const nameInput = document.getElementById('auth-name').value.trim();
+        gameState.heroName = nameInput || "Herói Anônimo";
         await setDoc(docRef, gameState);
     }
     checkDailyReset();
     updateUI();
 }
 
-// MONITOR DE AUTENTICAÇÃO (Roda automático quando abre o site)
+// CHANGER DE LOGIN / CADASTRO
+function updateAuthUI() {
+    const nameGroup = document.getElementById('group-auth-name');
+    const title = document.getElementById('auth-title');
+    const toggleLink = document.getElementById('toggle-auth-mode');
+    const btnLogin = document.getElementById('btn-login');
+    const btnRegister = document.getElementById('btn-register');
+
+    if (isRegisterMode) {
+        nameGroup.style.display = 'flex';
+        title.innerText = "📜 Registrar Novo Herói";
+        toggleLink.innerText = "Já tem uma conta? Entrar na guilda";
+        btnLogin.style.display = 'none';
+        btnRegister.style.display = 'block';
+    } else {
+        nameGroup.style.display = 'none';
+        title.innerText = "🛡️ Acessar Guilda";
+        toggleLink.innerText = "Não tem uma conta? Criar Novo Herói";
+        btnLogin.style.display = 'block';
+        btnRegister.style.display = 'none';
+    }
+}
+document.getElementById('toggle-auth-mode').addEventListener('click', (e) => {
+    e.preventDefault();
+    isRegisterMode = !isRegisterMode;
+    updateAuthUI();
+});
+
+// MONITOR DE CONTAS DO FIREBASE
 onAuthStateChanged(auth, async (user) => {
     const authContainer = document.getElementById('auth-container');
     const gameContainer = document.getElementById('game-container');
@@ -115,40 +164,44 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         await loadGameProgress(user);
+        document.getElementById('hero-avatar').src = getGravatarUrl(user.email);
         authContainer.classList.add('hidden');
         gameContainer.classList.remove('hidden');
     } else {
         currentUser = null;
+        isRegisterMode = false;
+        updateAuthUI();
         authContainer.classList.remove('hidden');
         gameContainer.classList.add('hidden');
     }
 });
 
-// EVENTOS DOS BOTÕES DE LOGIN / CADASTRO / LOGOUT
+// EVENTOS DE CLICK AUTENTICAÇÃO
 document.getElementById('btn-login').addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    if(!email || !password) return showPopup('error', 'Ops!', 'Preencha todos os campos.');
+    if(!email || !password) return showPopup('error', 'Ops!', 'Preencha os campos de Email e Senha.');
     
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        showPopup('success', 'Bem-vindo de volta!', 'Sua sessão foi carregada.');
     } catch (error) {
-        showPopup('error', 'Falha no Login', 'Verifique seu e-mail e senha.');
+        showPopup('error', 'Falha no Login', 'Verifique suas credenciais.');
     }
 });
 
 document.getElementById('btn-register').addEventListener('click', async () => {
+    const name = document.getElementById('auth-name').value.trim();
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    if(!email || !password) return showPopup('error', 'Ops!', 'Preencha todos os campos.');
-    if(password.length < 6) return showPopup('error', 'Senha Fraca', 'A senha deve conter no mínimo 6 dígitos.');
+
+    if(!name || !email || !password) return showPopup('error', 'Ops!', 'Preencha todos os campos para o registro.');
+    if(password.length < 6) return showPopup('error', 'Senha Fraca', 'A senha precisa ter pelo menos 6 caracteres.');
 
     try {
         await createUserWithEmailAndPassword(auth, email, password);
-        showPopup('success', 'Herói Registrado!', 'Sua conta foi criada com sucesso.');
+        showPopup('success', 'Guilda Aceita!', 'Sua conta de Herói foi gerada.');
     } catch (error) {
-        showPopup('error', 'Erro no Cadastro', 'Este e-mail pode já estar em uso.');
+        showPopup('error', 'Erro no Cadastro', 'O e-mail inserido já pode estar em uso.');
     }
 });
 
@@ -156,15 +209,10 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     signOut(auth);
 });
 
-// LÓGICA DO GAMEPLAY (MANTIDA IGUAL, MAS SALVANDO NA NUVEM)
-function calculateTaskXp() {
-    let totalTasks = gameState.tasks.filter(t => !t.completed).length;
-    if (totalTasks <= 1) return gameState.doubleXpActive ? 200 : 100;
-    let baseXp = Math.max(15, Math.floor(100 / totalTasks));
-    return gameState.doubleXpActive ? baseXp * 2 : baseXp;
-}
-
+// RENDEREZAÇÃO DA TELA
 function updateUI() {
+    document.getElementById('lbl-hero-name').innerText = gameState.heroName;
+    document.getElementById('lbl-hero-title').innerText = getHeroTitle(gameState.level);
     document.getElementById('lbl-level').innerText = gameState.level;
     document.getElementById('lbl-coins').innerText = gameState.coins;
     document.getElementById('lbl-current-xp').innerText = gameState.xp;
@@ -176,27 +224,52 @@ function updateUI() {
     
     let buffsHtml = "";
     if (gameState.doubleXpActive) buffsHtml += "<div>⚡ Multiplicador de XP 2x Ativo!</div>";
-    if (gameState.extraHours > 0) buffsHtml += `<div>⏳ Ampulheta: +${gameState.extraHours}h extras de prazo.</div>`;
+    if (gameState.extraHours > 0) buffsHtml += `<div>⏳ Ampulheta: +${gameState.extraHours}h extras no prazo.</div>`;
+    if (gameState.bonusCoinsLevelUp > 0) buffsHtml += `<div>📜 Pergaminho: +${gameState.bonusCoinsLevelUp}🪙 extras no Level Up!</div>`;
     document.getElementById('buffs-ativos').innerHTML = buffsHtml;
 
+    // Listagem de tarefas ativas
     const list = document.getElementById('task-list');
     list.innerHTML = "";
     gameState.tasks.forEach((task, index) => {
         if (!task.completed) {
             const li = document.createElement('li');
             li.innerHTML = `<span>${task.text}</span>`;
-            
             const btn = document.createElement('button');
             btn.className = 'btn-complete';
             btn.innerText = '✔ Concluir';
             btn.onclick = () => completeTask(index);
-            
             li.appendChild(btn);
             list.appendChild(li);
         }
     });
+
+    // Listagem de Histórico Diário
+    const historyList = document.getElementById('history-list');
+    historyList.innerHTML = "";
+    const sortedDates = Object.keys(gameState.history).sort((a,b) => b.localeCompare(a));
+    
+    if (sortedDates.length === 0) {
+        historyList.innerHTML = `<li style="background:transparent; border:none; padding:5px; color:#7c7c8a;">Nenhuma missão concluída registrada ainda.</li>`;
+    } else {
+        sortedDates.forEach(date => {
+            const hLi = document.createElement('li');
+            hLi.style.padding = "8px 12px";
+            hLi.style.background = "#14111f";
+            hLi.innerHTML = `<span>📅 ${date}</span> <strong style="color:var(--green)">✓ ${gameState.history[date]} concluídas</strong>`;
+            historyList.appendChild(hLi);
+        });
+    }
 }
 
+function calculateTaskXp() {
+    let totalTasks = gameState.tasks.filter(t => !t.completed).length;
+    if (totalTasks <= 1) return gameState.doubleXpActive ? 200 : 100;
+    let baseXp = Math.max(15, Math.floor(100 / totalTasks));
+    return gameState.doubleXpActive ? baseXp * 2 : baseXp;
+}
+
+// EVENTOS DE GAMEPLAY
 async function addTask() {
     const input = document.getElementById('task-input');
     if (input.value.trim() === "") return;
@@ -214,6 +287,11 @@ async function completeTask(index) {
     
     if (gameState.doubleXpActive) gameState.doubleXpActive = false;
 
+    // Adiciona ao Histórico do Dia
+    const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const dataBrasilia = new Intl.DateTimeFormat('pt-BR', options).format(new Date());
+    gameState.history[dataBrasilia] = (gameState.history[dataBrasilia] || 0) + 1;
+
     gainXp(earnedXp);
     updateUI();
     await saveGameProgress();
@@ -225,32 +303,53 @@ function gainXp(amount) {
         gameState.xp -= gameState.xpNeeded;
         gameState.level++;
         gameState.xpNeeded = Math.floor(gameState.xpNeeded * 1.2);
-        gameState.coins += 50;
-        showPopup('success', `LEVEL UP!`, `Parabéns! Você subiu para o Nível ${gameState.level} e faturou 50 Moedas!`);
+        
+        let baseAward = 50 + gameState.bonusCoinsLevelUp;
+        gameState.coins += baseAward;
+        
+        showPopup('success', `LEVEL UP!`, `Parabéns! Alcançou o nível ${gameState.level} (${getHeroTitle(gameState.level)}) e ganhou ${baseAward} Moedas!`);
     }
 }
 
+// CONTROLE DO MERCADO AMPLIADO
 async function buyItem(item, cost) {
     if (gameState.coins < cost) {
-        showPopup('error', 'Ação Bloqueada', 'Moedas insuficientes! Vá concluir mais algumas missões primeiro.');
+        showPopup('error', 'Sem fundos', 'Moedas insuficientes! Conclua mais tarefas diárias.');
         return;
     }
     gameState.coins -= cost;
 
     if (item === 'doubleXp') {
         gameState.doubleXpActive = true;
-        showPopup('info', 'Item Consumido', 'Você bebeu a Poção! Sua próxima missão dará o dobro de XP.');
+        showPopup('info', 'Poção Ingerida', 'Sua próxima missão renderá o dobro de XP total!');
     } else if (item === 'extraTime') {
         gameState.extraHours += 2;
-        showPopup('info', 'Item Consumido', 'Ampulheta ativa! Você ganhou +2 horas de tempo extra no prazo diário.');
+        showPopup('info', 'Tempo Distorcido', 'Você estendeu o prazo diário em mais +2 horas.');
+    } else if (item === 'elixirXp') {
+        gainXp(30);
+        showPopup('success', 'Elixir Consumido', 'Você tomou o Elixir Real e absorveu 30 XP instantaneamente!');
+    } else if (item === 'scrollBonus') {
+        gameState.bonusCoinsLevelUp += 10;
+        showPopup('success', 'Conhecimento Antigo', 'Pergaminho decifrado! Agora você ganhará +10 moedas adicionais a cada Level Up.');
     }
     updateUI();
     await saveGameProgress();
 }
+
 document.getElementById('btn-buy-xp').addEventListener('click', () => buyItem('doubleXp', 50));
 document.getElementById('btn-buy-time').addEventListener('click', () => buyItem('extraTime', 30));
+document.getElementById('btn-buy-elixir').addEventListener('click', () => buyItem('elixirXp', 40));
+document.getElementById('btn-buy-scroll').addEventListener('click', () => buyItem('scrollBonus', 120));
 
-// RELÓGIO REGRESSIVO (BRASÍLIA)
+// RESET DO HISTÓRICO
+document.getElementById('btn-clear-history').addEventListener('click', async () => {
+    gameState.history = {};
+    updateUI();
+    await saveGameProgress();
+    showPopup('info', 'Histórico Limpo', 'Seu livro de registros passados foi zerado.');
+});
+
+// CONTADORES E RELÓGIOS DE BRASÍLIA
 function updateCountdown() {
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
@@ -279,7 +378,6 @@ function updateCountdown() {
     document.getElementById('reset-timer').innerText = `⏳ ${pad(displayHrs)}h ${pad(displayMins)}m ${pad(displaySecs)}s`;
 }
 
-// RESET DIÁRIO
 async function checkDailyReset() {
     const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' };
     const dataBrasilia = new Intl.DateTimeFormat('pt-BR', options).format(new Date());
@@ -290,12 +388,13 @@ async function checkDailyReset() {
         gameState.lastResetDate = dataBrasilia;
         updateUI();
         await saveGameProgress();
-        showPopup('info', 'Novo Dia!', 'Suas missões diárias foram renovadas! Boa sorte hoje.');
+        showPopup('info', 'Novo Dia!', 'Suas missões diárias recomeçaram.');
     }
 }
 
-// INICIALIZAÇÃO E LOADING SCREEN
+// INICIALIZADOR DO PRODUTO
 window.addEventListener('DOMContentLoaded', () => {
+    updateAuthUI();
     let progress = 0;
     const loaderBar = document.getElementById('loader-progress');
     const loadingScreen = document.getElementById('loading-screen');

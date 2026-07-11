@@ -30,6 +30,11 @@
 <div id="auth-container" class="auth-screen hidden">
     <div class="auth-box">
         <h2 id="auth-title">🛡️ Acessar Guilda</h2>
+        
+        <div class="input-group-auth" id="group-auth-name">
+            <label>Nome do Herói</label>
+            <input type="text" id="auth-name" placeholder="Ex: Navarre">
+        </div>
         <div class="input-group-auth">
             <label>Seu Email de Herói</label>
             <input type="email" id="auth-email" placeholder="exemplo@rpg.com">
@@ -43,14 +48,23 @@
             <button id="btn-login" class="btn-add">Entrar na Jornada</button>
             <button id="btn-register" class="btn-shop">Criar Novo Herói</button>
         </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="#" id="toggle-auth-mode" style="color: #a370f7; font-size: 0.85rem; text-decoration: none;">Já tem uma conta? Entrar na jornada</a>
+        </div>
     </div>
 </div>
 
 <div id="game-container" class="container hidden">
     <div class="panel">
         <div class="panel-header">
-            <h2>Status do Herói</h2>
-            <button id="btn-logout" class="btn-logout" style="padding: 6px 12px; background: #ff5577; font-size: 0.8rem;">🚪 Sair</button>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img id="hero-avatar" src="" alt="Avatar" style="width: 45px; height: 45px; border-radius: 50%; border: 2px solid #8257e5; background: #0f0d14;">
+                <div>
+                    <h3 id="lbl-hero-name" style="margin: 0; font-size: 1.1rem; color: #fff;">Herói</h3>
+                    <small id="lbl-hero-title" style="color: #ffc83b; font-weight: bold; font-size: 0.8rem;">Recruta</small>
+                </div>
+            </div>
+            <button id="btn-logout" class="btn-logout" style="padding: 6px 12px; background: #ff5577; font-size: 0.8rem; border: none; border-radius: 8px; color: white; cursor: pointer;">🚪 Sair</button>
         </div>
         <div class="status-group">
             <div class="stats-text">
@@ -74,19 +88,35 @@
         <div class="divider"></div>
 
         <h2>Lojinha de Vantagens</h2>
-        <div class="shop-item">
-            <div>
-                <strong>Poção de XP Dobrado</strong>
-                <small>Próxima tarefa dá o dobro de XP</small>
+        <div style="max-height: 240px; overflow-y: auto; padding-right: 5px;">
+            <div class="shop-item">
+                <div>
+                    <strong>Poção de XP Dobrado</strong>
+                    <small>Próxima tarefa dá o dobro de XP</small>
+                </div>
+                <button class="btn-shop" id="btn-buy-xp">Comprar (<span class="price">50🪙</span>)</button>
             </div>
-            <button class="btn-shop" id="btn-buy-xp">Comprar (<span class="price">50🪙</span>)</button>
-        </div>
-        <div class="shop-item">
-            <div>
-                <strong>Ampulheta do Tempo</strong>
-                <small>Adiciona +2 horas no prazo diário</small>
+            <div class="shop-item">
+                <div>
+                    <strong>Ampulheta do Tempo</strong>
+                    <small>Adiciona +2 horas no prazo diário</small>
+                </div>
+                <button class="btn-shop" id="btn-buy-time">Comprar (<span class="price">30🪙</span>)</button>
             </div>
-            <button class="btn-shop" id="btn-buy-time">Comprar (<span class="price">30🪙</span>)</button>
+            <div class="shop-item">
+                <div>
+                    <strong>Poção de Elixir Real</strong>
+                    <small>Ganha 30 XP instantaneamente</small>
+                </div>
+                <button class="btn-shop" id="btn-buy-elixir">Comprar (<span class="price">40🪙</span>)</button>
+            </div>
+            <div class="shop-item">
+                <div>
+                    <strong>Pergaminho de Mestre</strong>
+                    <small>Aumenta permanentemente moedas ganhas por Level Up (+10🪙)</small>
+                </div>
+                <button class="btn-shop" id="btn-buy-scroll">Comprar (<span class="price">120🪙</span>)</button>
+            </div>
         </div>
     </div>
 
@@ -103,6 +133,15 @@
             <button class="btn-add" id="btn-add-task">+ Aceitar</button>
         </div>
         <ul id="task-list"></ul>
+
+        <div class="divider"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="margin: 0; border: none; padding: 0; font-size: 1.2rem;">📜 Histórico de Conquistas</h2>
+            <button id="btn-clear-history" style="padding: 4px 10px; background: rgba(255,85,119,0.1); border: 1px solid rgba(255,85,119,0.3); color: #ff5577; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Limpar</button>
+        </div>
+        <ul id="history-list" style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);">
+            </ul>
     </div>
 </div>
 
