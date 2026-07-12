@@ -72,13 +72,13 @@ h2 {
 }
 
 .shop-title {
-    margin: 10;
+    margin: 0;
 }
 
 .shop-countdown {
     font-size: 0.8rem;
     background: #2c263d;
-    padding: 14px 12px;
+    padding: 6px 12px;
     border-radius: 6px;
     color: var(--gold);
     font-weight: bold;
