@@ -23,7 +23,8 @@
         <div class="popup-icon" id="popup-icon">❌</div>
         <h3 id="popup-title">Ação Bloqueada</h3>
         <p id="popup-message">Mensagem de erro aqui.</p>
-        <button class="btn-popup-close" id="btn-popup-close">Entendido</button>
+        <div id="popup-extra-content" style="margin-top: 15px; text-align: left; max-height: 150px; overflow-y: auto;"></div>
+        <button class="btn-popup-close" id="btn-popup-close" style="margin-top: 15px;">Entendido</button>
     </div>
 </div>
 
@@ -117,6 +118,7 @@
             <h2 style="margin: 0; border: none; padding: 0; font-size: 1.2rem;">📜 Histórico de Conquistas</h2>
             <button id="btn-clear-history" style="padding: 4px 10px; background: rgba(255,85,119,0.1); border: 1px solid rgba(255,85,119,0.3); color: #ff5577; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Limpar</button>
         </div>
+        <p style="font-size: 0.75rem; color: var(--text-detail); margin: -5px 0 10px 0;">💡 Clique em um dia para ver quais missões você completou nele!</p>
         <ul id="history-list" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);"></ul>
     </div>
 </div>

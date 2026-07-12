@@ -30,7 +30,6 @@ const db = getFirestore(app);
 let currentUser = null;
 let isRegisterMode = false;
 
-// CATALOGO COMPLETO DA LOJA (8 ITENS DISPONÍVEIS)
 const ALL_PRODUCTS = {
     doubleXp: { name: "Poção de XP Dobrado", desc: "Próxima tarefa concluída dá o dobro de XP", price: 50, icon: "🧪" },
     extraTime: { name: "Ampulheta do Tempo", desc: "Adiciona +2 horas no prazo limite do dia", price: 30, icon: "⏳" },
@@ -50,8 +49,8 @@ let gameState = {
     bonusTaskXp: 0,
     discountXpPercent: 0,
     nextTaskBonusCoins: 0,
-    history: {},
-    currentDailyShop: [] // Guarda os IDs dos 5 itens sorteados no dia
+    history: {}, // Guardará objetos: {"DD/MM/AAAA": { count: X, missionNames: [...] }}
+    currentDailyShop: []
 };
 
 const INITIAL_STATE = {
@@ -84,15 +83,26 @@ function getGravatarUrl(email) {
     return `https://www.gravatar.com/avatar/${Math.abs(hash)}?d=identicon&s=150`;
 }
 
-window.showPopup = function(type, title, message) {
+window.showPopup = function(type, title, message, itemsList = null) {
     const popup = document.getElementById('custom-popup');
     const iconElement = document.getElementById('popup-icon');
     const titleElement = document.getElementById('popup-title');
     const msgElement = document.getElementById('popup-message');
     const boxElement = document.querySelector('.popup-box');
+    const extraContent = document.getElementById('popup-extra-content');
 
     titleElement.innerText = title;
     msgElement.innerText = message;
+    extraContent.innerHTML = "";
+
+    if (itemsList && itemsList.length > 0) {
+        itemsList.forEach(m => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'history-modal-li';
+            itemDiv.innerText = m;
+            extraContent.appendChild(itemDiv);
+        });
+    }
 
     if (type === 'error') {
         iconElement.innerText = '❌';
@@ -106,6 +116,10 @@ window.showPopup = function(type, title, message) {
         iconElement.innerText = '⚡';
         titleElement.style.color = '#ffc83b';
         boxElement.style.borderColor = '#ffc83b';
+    } else if (type === 'history') {
+        iconElement.innerText = '📜';
+        titleElement.style.color = '#a370f7';
+        boxElement.style.borderColor = '#a370f7';
     }
     popup.classList.add('active');
 }
@@ -220,7 +234,6 @@ document.getElementById('btn-register').addEventListener('click', async () => {
 
 document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); });
 
-// LÓGICA DA LOJA ROTATIVA: ESCOLHE 5 PRODUTOS DIFERENTES
 function generateDailyShopRotation() {
     const productKeys = Object.keys(ALL_PRODUCTS);
     const shuffled = productKeys.sort(() => 0.5 - Math.random());
@@ -248,29 +261,39 @@ function updateUI() {
     if (gameState.nextTaskBonusCoins > 0) buffsHtml += `<div>☕ Café: Próxima missão dá +${gameState.nextTaskBonusCoins} moedas bônus!</div>`;
     document.getElementById('buffs-ativos').innerHTML = buffsHtml;
 
-    // Listar missões
+    // Listar missões com botão de Concluir e Deletar
     const list = document.getElementById('task-list');
     list.innerHTML = "";
     gameState.tasks.forEach((task, index) => {
         if (!task.completed) {
             const li = document.createElement('li');
             li.innerHTML = `<span>${task.text}</span>`;
-            const btn = document.createElement('button');
-            btn.className = 'btn-complete';
-            btn.innerText = '✔ Concluir';
-            btn.onclick = () => completeTask(index);
-            li.appendChild(btn);
+            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.style.display = "flex";
+            actionsDiv.style.gap = "6px";
+
+            const btnComp = document.createElement('button');
+            btnComp.className = 'btn-complete';
+            btnComp.innerText = '✔';
+            btnComp.onclick = () => completeTask(index);
+
+            const btnDel = document.createElement('button');
+            btnDel.className = 'btn-delete-task';
+            btnDel.innerText = '🗑️';
+            btnDel.onclick = () => deleteTask(index);
+
+            actionsDiv.appendChild(btnComp);
+            actionsDiv.appendChild(btnDel);
+            li.appendChild(actionsDiv);
             list.appendChild(li);
         }
     });
 
-    // Renderizar Lojinha Rotativa de 5 Itens
+    // Renderizar Lojinha
     const shopContainer = document.getElementById('shop-container');
     shopContainer.innerHTML = "";
-    
-    if(gameState.currentDailyShop.length === 0) {
-        generateDailyShopRotation();
-    }
+    if(gameState.currentDailyShop.length === 0) generateDailyShopRotation();
 
     gameState.currentDailyShop.forEach(itemKey => {
         const item = ALL_PRODUCTS[itemKey];
@@ -286,11 +309,10 @@ function updateUI() {
             <button class="btn-shop" id="btn-buy-${itemKey}">Comprar (<span class="price">${item.price}🪙</span>)</button>
         `;
         shopContainer.appendChild(itemDiv);
-        
         document.getElementById(`btn-buy-${itemKey}`).onclick = () => buyItem(itemKey, item.price);
     });
 
-    // Histórico
+    // Histórico Clicável
     const historyList = document.getElementById('history-list');
     historyList.innerHTML = "";
     const sortedDates = Object.keys(gameState.history).sort((a,b) => b.localeCompare(a));
@@ -298,19 +320,33 @@ function updateUI() {
         historyList.innerHTML = `<li style="background:transparent; border:none; padding:5px; color:#7c7c8a;">Nenhuma missão registrada ainda.</li>`;
     } else {
         sortedDates.forEach(date => {
+            const record = gameState.history[date];
+            // Garante compatibilidade caso o registro antigo seja apenas um número
+            const totalCount = (typeof record === 'object') ? record.count : record;
+            const names = (typeof record === 'object') ? record.missionNames : [];
+
             const hLi = document.createElement('li');
-            hLi.style.padding = "8px 12px"; hLi.style.background = "#14111f";
-            hLi.innerHTML = `<span>📅 ${date}</span> <strong style="color:var(--green)">✓ ${gameState.history[date]} concluídas</strong>`;
+            hLi.className = "history-item-clickable";
+            hLi.style.padding = "8px 12px"; 
+            hLi.style.background = "#14111f";
+            hLi.innerHTML = `<span>📅 ${date}</span> <strong style="color:var(--green)">✓ ${totalCount} concluídas</strong>`;
+            
+            // Evento de clique para abrir os detalhes das missões concluídas naquele dia
+            hLi.onclick = () => {
+                showPopup('history', `Conquistas de ${date}`, `Você concluiu ${totalCount} missão(ões) neste dia:`, names);
+            };
+
             historyList.appendChild(hLi);
         });
     }
 }
 
+// REMOÇÃO DO LIMITE MÍNIMO DE 15 XP
 function calculateTaskXp() {
     let totalTasks = gameState.tasks.filter(t => !t.completed).length;
     let baseXp = 100;
     if (totalTasks > 1) {
-        baseXp = Math.max(15, Math.floor(100 / totalTasks));
+        baseXp = Math.floor(100 / totalTasks); // Sem o Math.max(15, ...) antigo! Vai diminuindo livremente.
     }
     
     baseXp += gameState.bonusTaskXp; 
@@ -328,18 +364,36 @@ async function addTask() {
 }
 document.getElementById('btn-add-task').addEventListener('click', addTask);
 
+// APAGAR TAREFA COMPLETAMENTE
+async function deleteTask(index) {
+    gameState.tasks.splice(index, 1);
+    updateUI();
+    await saveGameProgress();
+}
+
 async function completeTask(index) {
     let earnedXp = calculateTaskXp();
+    const finishedTaskText = gameState.tasks[index].text;
     gameState.tasks[index].completed = true;
     
     if (gameState.doubleXpActive) gameState.doubleXpActive = false;
-    if (gameState.bonusTaskXp > 0) gameState.bonusTaskXp = 0; // Gasta o bônus do escudo
+    if (gameState.bonusTaskXp > 0) gameState.bonusTaskXp = 0;
 
     const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' };
     const dataBrasilia = new Intl.DateTimeFormat('pt-BR', options).format(new Date());
-    gameState.history[dataBrasilia] = (gameState.history[dataBrasilia] || 0) + 1;
+    
+    // Inicializa a nova estrutura estruturada de histórico se não existir
+    if (!gameState.history[dataBrasilia] || typeof gameState.history[dataBrasilia] !== 'object') {
+        const oldVal = gameState.history[dataBrasilia] || 0;
+        gameState.history[dataBrasilia] = {
+            count: typeof oldVal === 'object' ? oldVal.count : oldVal,
+            missionNames: []
+        };
+    }
+    
+    gameState.history[dataBrasilia].count += 1;
+    gameState.history[dataBrasilia].missionNames.push(finishedTaskText);
 
-    // Moedas recebidas + bônus do café se houver
     gameState.coins += gameState.nextTaskBonusCoins;
     if(gameState.nextTaskBonusCoins > 0) gameState.nextTaskBonusCoins = 0;
 
@@ -364,7 +418,6 @@ function gainXp(amount) {
     }
 }
 
-// EXECUÇÃO DAS COMPRAS DA LOJA
 async function buyItem(item, cost) {
     if (gameState.coins < cost) {
         showPopup('error', 'Sem moedas', 'Vá terminar suas missões para conseguir fundos!');
@@ -385,7 +438,7 @@ async function buyItem(item, cost) {
         gameState.bonusCoinsLevelUp += 10;
         showPopup('success', 'Conhecimento Antigo', 'Você ganhará +10 moedas adicionais a cada Level Up.');
     } else if (item === 'luckyDice') {
-        let sortedCoins = Math.floor(Math.random() * 71) + 10; // 10 a 80 moedas
+        let sortedCoins = Math.floor(Math.random() * 71) + 10;
         gameState.coins += sortedCoins;
         showPopup('success', 'Dado Rolado! 🎲', `O dado parou! Você tirou a sorte grande e ganhou ${sortedCoins} moedas!`);
     } else if (item === 'shieldProtection') {
@@ -445,10 +498,7 @@ async function checkDailyReset() {
         gameState.tasks.forEach(t => t.completed = false);
         gameState.extraHours = 0; 
         gameState.lastResetDate = dataBrasilia;
-        
-        // MUDANÇA DA LOJA: Sorteia novos 5 itens ao virar o dia!
         generateDailyShopRotation(); 
-
         updateUI();
         await saveGameProgress();
         showPopup('info', 'Dia Atualizado!', 'As missões e os itens do Mercado Diário mudaram!');
