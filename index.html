@@ -66,6 +66,7 @@
             </div>
             <button id="btn-logout" class="btn-logout" style="padding: 6px 12px; background: #ff5577; font-size: 0.8rem; border: none; border-radius: 8px; color: white; cursor: pointer;">🚪 Sair</button>
         </div>
+        
         <div class="status-group">
             <div class="stats-text">
                 <span class="level-badge">LVL <span id="lbl-level">1</span></span>
@@ -87,11 +88,12 @@
 
         <div class="divider"></div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="margin: 0; border: none; padding: 0;">🛒 Mercado do Dia (5 Itens)</h2>
-            <span id="shop-timer" style="font-size: 0.75rem; background: #2c263d; padding: 4px 8px; border-radius: 4px; color: #ffc83b;">🔄 Nova Loja em: 00h</span>
+        <div class="shop-header-container">
+            <h2 class="shop-title">🛒 Mercado do Dia</h2>
+            <span id="shop-timer" class="shop-countdown">🔄 Nova Loja em: --h</span>
         </div>
-        <div id="shop-container" style="max-height: 280px; overflow-y: auto; padding-right: 5px;">
+        
+        <div id="shop-container" class="shop-grid">
             </div>
     </div>
 
@@ -115,7 +117,7 @@
             <h2 style="margin: 0; border: none; padding: 0; font-size: 1.2rem;">📜 Histórico de Conquistas</h2>
             <button id="btn-clear-history" style="padding: 4px 10px; background: rgba(255,85,119,0.1); border: 1px solid rgba(255,85,119,0.3); color: #ff5577; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Limpar</button>
         </div>
-        <ul id="history-list" style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);"></ul>
+        <ul id="history-list" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);"></ul>
     </div>
 </div>
 
