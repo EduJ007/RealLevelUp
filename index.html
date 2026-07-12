@@ -87,37 +87,12 @@
 
         <div class="divider"></div>
 
-        <h2>Lojinha de Vantagens</h2>
-        <div style="max-height: 300px; overflow-y: auto; padding-right: 5px;">
-            <div class="shop-item">
-                <div>
-                    <strong>Poção de XP Dobrado</strong>
-                    <small>Próxima tarefa dá o dobro de XP</small>
-                </div>
-                <button class="btn-shop" id="btn-buy-xp">Comprar (<span class="price">50🪙</span>)</button>
-            </div>
-            <div class="shop-item">
-                <div>
-                    <strong>Ampulheta do Tempo</strong>
-                    <small>Adiciona +2 horas no prazo diário</small>
-                </div>
-                <button class="btn-shop" id="btn-buy-time">Comprar (<span class="price">30🪙</span>)</button>
-            </div>
-            <div class="shop-item">
-                <div>
-                    <strong>Poção de Elixir Real</strong>
-                    <small>Ganha 30 XP instantaneamente</small>
-                </div>
-                <button class="btn-shop" id="btn-buy-elixir">Comprar (<span class="price">40🪙</span>)</button>
-            </div>
-            <div class="shop-item">
-                <div>
-                    <strong>Pergaminho de Mestre</strong>
-                    <small>Aumenta permanentemente moedas ganhas por Level Up (+10🪙)</small>
-                </div>
-                <button class="btn-shop" id="btn-buy-scroll">Comprar (<span class="price">120🪙</span>)</button>
-            </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="margin: 0; border: none; padding: 0;">🛒 Mercado do Dia (5 Itens)</h2>
+            <span id="shop-timer" style="font-size: 0.75rem; background: #2c263d; padding: 4px 8px; border-radius: 4px; color: #ffc83b;">🔄 Nova Loja em: 00h</span>
         </div>
+        <div id="shop-container" style="max-height: 280px; overflow-y: auto; padding-right: 5px;">
+            </div>
     </div>
 
     <div class="panel">
@@ -140,8 +115,7 @@
             <h2 style="margin: 0; border: none; padding: 0; font-size: 1.2rem;">📜 Histórico de Conquistas</h2>
             <button id="btn-clear-history" style="padding: 4px 10px; background: rgba(255,85,119,0.1); border: 1px solid rgba(255,85,119,0.3); color: #ff5577; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Limpar</button>
         </div>
-        <ul id="history-list" style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);">
-            </ul>
+        <ul id="history-list" style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; color: var(--text-detail);"></ul>
     </div>
 </div>
 

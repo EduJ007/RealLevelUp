@@ -28,14 +28,30 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null;
-let isRegisterMode = false; // Controle de tela Login / Cadastro
+let isRegisterMode = false;
+
+// CATALOGO COMPLETO DA LOJA (8 ITENS DISPONÍVEIS)
+const ALL_PRODUCTS = {
+    doubleXp: { name: "Poção de XP Dobrado", desc: "Próxima tarefa concluída dá o dobro de XP", price: 50, icon: "🧪" },
+    extraTime: { name: "Ampulheta do Tempo", desc: "Adiciona +2 horas no prazo limite do dia", price: 30, icon: "⏳" },
+    elixirXp: { name: "Elixir Real", desc: "Consome na hora para ganhar +30 XP puro", price: 40, icon: "🧪" },
+    scrollBonus: { name: "Pergaminho de Mestre", desc: "Permanente: +10 moedas bônus ao subir de nível", price: 120, icon: "📜" },
+    luckyDice: { name: "Dado de Madeira", desc: "Ganha entre 10 e 80 moedas na hora (Sorte)", price: 45, icon: "🎲" },
+    shieldProtection: { name: "Escudo do Alvorecer", desc: "Próxima tarefa criada começa dando +15 XP fixo", price: 35, icon: "🛡️" },
+    guildContract: { name: "Contrato de Mercenário", desc: "Permanente: Reduz em 5% o XP necessário para upar", price: 160, icon: "📄" },
+    coffeeBuff: { name: "Café Alquímico", desc: "Sua próxima tarefa rende +25 moedas extras", price: 25, icon: "☕" }
+};
 
 let gameState = {
     heroName: "Herói",
     level: 1, xp: 0, xpNeeded: 100, coins: 0,
     tasks: [], doubleXpActive: false, extraHours: 0, lastResetDate: "",
     bonusCoinsLevelUp: 0,
-    history: {} // Armazena {"DD/MM/AAAA": totalConcluido}
+    bonusTaskXp: 0,
+    discountXpPercent: 0,
+    nextTaskBonusCoins: 0,
+    history: {},
+    currentDailyShop: [] // Guarda os IDs dos 5 itens sorteados no dia
 };
 
 const INITIAL_STATE = {
@@ -43,10 +59,13 @@ const INITIAL_STATE = {
     level: 1, xp: 0, xpNeeded: 100, coins: 0,
     tasks: [], doubleXpActive: false, extraHours: 0, lastResetDate: "",
     bonusCoinsLevelUp: 0,
-    history: {}
+    bonusTaskXp: 0,
+    discountXpPercent: 0,
+    nextTaskBonusCoins: 0,
+    history: {},
+    currentDailyShop: []
 };
 
-// TITULOS DE ACORDO COM O NÍVEL
 function getHeroTitle(level) {
     if (level >= 25) return "🧙‍♂️ Mestre Supremo";
     if (level >= 18) return "🔱 Cavaleiro Paladino";
@@ -56,10 +75,8 @@ function getHeroTitle(level) {
     return "🌱 Aprendiz da Guilda";
 }
 
-// GERA IMAGEM DE PERFIL DINÂMICA VIA EMAIL DO GRAVATAR (Identicon gamer se o e-mail não tiver cadastro lá)
 function getGravatarUrl(email) {
     const cleanEmail = email.trim().toLowerCase();
-    // Função simples para gerar um hash numérico rápido para o avatar padrão
     let hash = 0;
     for (let i = 0; i < cleanEmail.length; i++) {
         hash = cleanEmail.charCodeAt(i) + ((hash << 5) - hash);
@@ -67,7 +84,6 @@ function getGravatarUrl(email) {
     return `https://www.gravatar.com/avatar/${Math.abs(hash)}?d=identicon&s=150`;
 }
 
-// POP-UP CUSTOMIZADO
 window.showPopup = function(type, title, message) {
     const popup = document.getElementById('custom-popup');
     const iconElement = document.getElementById('popup-icon');
@@ -99,7 +115,6 @@ window.closePopup = function() {
 }
 document.getElementById('btn-popup-close').addEventListener('click', closePopup);
 
-// GRAVAÇÃO E LEITURA CLOUD FIRESTORE
 async function saveGameProgress() {
     if (!currentUser) return;
     try {
@@ -116,8 +131,10 @@ async function loadGameProgress(user) {
     if (docSnap.exists()) {
         gameState = docSnap.data();
         if (!gameState.history) gameState.history = {};
-        if (!gameState.heroName) gameState.heroName = "Herói";
-        if (gameState.bonusCoinsLevelUp === undefined) gameState.bonusCoinsLevelUp = 0;
+        if (!gameState.currentDailyShop) gameState.currentDailyShop = [];
+        if (gameState.bonusTaskXp === undefined) gameState.bonusTaskXp = 0;
+        if (gameState.discountXpPercent === undefined) gameState.discountXpPercent = 0;
+        if (gameState.nextTaskBonusCoins === undefined) gameState.nextTaskBonusCoins = 0;
     } else {
         gameState = { ...INITIAL_STATE };
         const nameInput = document.getElementById('auth-name').value.trim();
@@ -128,7 +145,6 @@ async function loadGameProgress(user) {
     updateUI();
 }
 
-// CHANGER DE LOGIN / CADASTRO
 function updateAuthUI() {
     const nameGroup = document.getElementById('group-auth-name');
     const title = document.getElementById('auth-title');
@@ -156,7 +172,6 @@ document.getElementById('toggle-auth-mode').addEventListener('click', (e) => {
     updateAuthUI();
 });
 
-// MONITOR DE CONTAS DO FIREBASE
 onAuthStateChanged(auth, async (user) => {
     const authContainer = document.getElementById('auth-container');
     const gameContainer = document.getElementById('game-container');
@@ -176,12 +191,10 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// EVENTOS DE CLICK AUTENTICAÇÃO
 document.getElementById('btn-login').addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
     if(!email || !password) return showPopup('error', 'Ops!', 'Preencha os campos de Email e Senha.');
-    
     try {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
@@ -194,8 +207,8 @@ document.getElementById('btn-register').addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
 
-    if(!name || !email || !password) return showPopup('error', 'Ops!', 'Preencha todos os campos para o registro.');
-    if(password.length < 6) return showPopup('error', 'Senha Fraca', 'A senha precisa ter pelo menos 6 caracteres.');
+    if(!name || !email || !password) return showPopup('error', 'Ops!', 'Preencha todos os campos.');
+    if(password.length < 6) return showPopup('error', 'Senha Fraca', 'Mínimo de 6 caracteres.');
 
     try {
         await createUserWithEmailAndPassword(auth, email, password);
@@ -205,11 +218,15 @@ document.getElementById('btn-register').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btn-logout').addEventListener('click', () => {
-    signOut(auth);
-});
+document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); });
 
-// RENDEREZAÇÃO DA TELA
+// LÓGICA DA LOJA ROTATIVA: ESCOLHE 5 PRODUTOS DIFERENTES
+function generateDailyShopRotation() {
+    const productKeys = Object.keys(ALL_PRODUCTS);
+    const shuffled = productKeys.sort(() => 0.5 - Math.random());
+    gameState.currentDailyShop = shuffled.slice(0, 5);
+}
+
 function updateUI() {
     document.getElementById('lbl-hero-name').innerText = gameState.heroName;
     document.getElementById('lbl-hero-title').innerText = getHeroTitle(gameState.level);
@@ -226,9 +243,12 @@ function updateUI() {
     if (gameState.doubleXpActive) buffsHtml += "<div>⚡ Multiplicador de XP 2x Ativo!</div>";
     if (gameState.extraHours > 0) buffsHtml += `<div>⏳ Ampulheta: +${gameState.extraHours}h extras no prazo.</div>`;
     if (gameState.bonusCoinsLevelUp > 0) buffsHtml += `<div>📜 Pergaminho: +${gameState.bonusCoinsLevelUp}🪙 extras no Level Up!</div>`;
+    if (gameState.bonusTaskXp > 0) buffsHtml += `<div>🛡️ Escudo: Próxima missão começa com +${gameState.bonusTaskXp} XP fixo!</div>`;
+    if (gameState.discountXpPercent > 0) buffsHtml += `<div>📄 Contrato: Requisito de XP reduzido em -${gameState.discountXpPercent}%!</div>`;
+    if (gameState.nextTaskBonusCoins > 0) buffsHtml += `<div>☕ Café: Próxima missão dá +${gameState.nextTaskBonusCoins} moedas bônus!</div>`;
     document.getElementById('buffs-ativos').innerHTML = buffsHtml;
 
-    // Listagem de tarefas ativas
+    // Listar missões
     const list = document.getElementById('task-list');
     list.innerHTML = "";
     gameState.tasks.forEach((task, index) => {
@@ -244,18 +264,42 @@ function updateUI() {
         }
     });
 
-    // Listagem de Histórico Diário
+    // Renderizar Lojinha Rotativa de 5 Itens
+    const shopContainer = document.getElementById('shop-container');
+    shopContainer.innerHTML = "";
+    
+    if(gameState.currentDailyShop.length === 0) {
+        generateDailyShopRotation();
+    }
+
+    gameState.currentDailyShop.forEach(itemKey => {
+        const item = ALL_PRODUCTS[itemKey];
+        if(!item) return;
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'shop-item';
+        itemDiv.innerHTML = `
+            <div>
+                <strong>${item.icon} ${item.name}</strong>
+                <small>${item.desc}</small>
+            </div>
+            <button class="btn-shop" id="btn-buy-${itemKey}">Comprar (<span class="price">${item.price}🪙</span>)</button>
+        `;
+        shopContainer.appendChild(itemDiv);
+        
+        document.getElementById(`btn-buy-${itemKey}`).onclick = () => buyItem(itemKey, item.price);
+    });
+
+    // Histórico
     const historyList = document.getElementById('history-list');
     historyList.innerHTML = "";
     const sortedDates = Object.keys(gameState.history).sort((a,b) => b.localeCompare(a));
-    
     if (sortedDates.length === 0) {
-        historyList.innerHTML = `<li style="background:transparent; border:none; padding:5px; color:#7c7c8a;">Nenhuma missão concluída registrada ainda.</li>`;
+        historyList.innerHTML = `<li style="background:transparent; border:none; padding:5px; color:#7c7c8a;">Nenhuma missão registrada ainda.</li>`;
     } else {
         sortedDates.forEach(date => {
             const hLi = document.createElement('li');
-            hLi.style.padding = "8px 12px";
-            hLi.style.background = "#14111f";
+            hLi.style.padding = "8px 12px"; hLi.style.background = "#14111f";
             hLi.innerHTML = `<span>📅 ${date}</span> <strong style="color:var(--green)">✓ ${gameState.history[date]} concluídas</strong>`;
             historyList.appendChild(hLi);
         });
@@ -264,12 +308,15 @@ function updateUI() {
 
 function calculateTaskXp() {
     let totalTasks = gameState.tasks.filter(t => !t.completed).length;
-    if (totalTasks <= 1) return gameState.doubleXpActive ? 200 : 100;
-    let baseXp = Math.max(15, Math.floor(100 / totalTasks));
+    let baseXp = 100;
+    if (totalTasks > 1) {
+        baseXp = Math.max(15, Math.floor(100 / totalTasks));
+    }
+    
+    baseXp += gameState.bonusTaskXp; 
     return gameState.doubleXpActive ? baseXp * 2 : baseXp;
 }
 
-// EVENTOS DE GAMEPLAY
 async function addTask() {
     const input = document.getElementById('task-input');
     if (input.value.trim() === "") return;
@@ -286,11 +333,15 @@ async function completeTask(index) {
     gameState.tasks[index].completed = true;
     
     if (gameState.doubleXpActive) gameState.doubleXpActive = false;
+    if (gameState.bonusTaskXp > 0) gameState.bonusTaskXp = 0; // Gasta o bônus do escudo
 
-    // Adiciona ao Histórico do Dia
     const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' };
     const dataBrasilia = new Intl.DateTimeFormat('pt-BR', options).format(new Date());
     gameState.history[dataBrasilia] = (gameState.history[dataBrasilia] || 0) + 1;
+
+    // Moedas recebidas + bônus do café se houver
+    gameState.coins += gameState.nextTaskBonusCoins;
+    if(gameState.nextTaskBonusCoins > 0) gameState.nextTaskBonusCoins = 0;
 
     gainXp(earnedXp);
     updateUI();
@@ -302,19 +353,21 @@ function gainXp(amount) {
     while (gameState.xp >= gameState.xpNeeded) {
         gameState.xp -= gameState.xpNeeded;
         gameState.level++;
-        gameState.xpNeeded = Math.floor(gameState.xpNeeded * 1.2);
+        
+        let multiplier = 1.2 - (gameState.discountXpPercent / 100);
+        gameState.xpNeeded = Math.floor(gameState.xpNeeded * Math.max(1.05, multiplier));
         
         let baseAward = 50 + gameState.bonusCoinsLevelUp;
         gameState.coins += baseAward;
         
-        showPopup('success', `LEVEL UP!`, `Parabéns! Alcançou o nível ${gameState.level} (${getHeroTitle(gameState.level)}) e ganhou ${baseAward} Moedas!`);
+        showPopup('success', `LEVEL UP!`, `Alcançou o nível ${gameState.level} (${getHeroTitle(gameState.level)}) e ganhou ${baseAward} Moedas!`);
     }
 }
 
-// CONTROLE DO MERCADO AMPLIADO
+// EXECUÇÃO DAS COMPRAS DA LOJA
 async function buyItem(item, cost) {
     if (gameState.coins < cost) {
-        showPopup('error', 'Sem fundos', 'Moedas insuficientes! Conclua mais tarefas diárias.');
+        showPopup('error', 'Sem moedas', 'Vá terminar suas missões para conseguir fundos!');
         return;
     }
     gameState.coins -= cost;
@@ -327,21 +380,28 @@ async function buyItem(item, cost) {
         showPopup('info', 'Tempo Distorcido', 'Você estendeu o prazo diário em mais +2 horas.');
     } else if (item === 'elixirXp') {
         gainXp(30);
-        showPopup('success', 'Elixir Consumido', 'Você tomou o Elixir Real e absorveu 30 XP instantaneamente!');
+        showPopup('success', 'Elixir Consumido', 'Você absorveu 30 XP instantaneamente!');
     } else if (item === 'scrollBonus') {
         gameState.bonusCoinsLevelUp += 10;
-        showPopup('success', 'Conhecimento Antigo', 'Pergaminho decifrado! Agora você ganhará +10 moedas adicionais a cada Level Up.');
+        showPopup('success', 'Conhecimento Antigo', 'Você ganhará +10 moedas adicionais a cada Level Up.');
+    } else if (item === 'luckyDice') {
+        let sortedCoins = Math.floor(Math.random() * 71) + 10; // 10 a 80 moedas
+        gameState.coins += sortedCoins;
+        showPopup('success', 'Dado Rolado! 🎲', `O dado parou! Você tirou a sorte grande e ganhou ${sortedCoins} moedas!`);
+    } else if (item === 'shieldProtection') {
+        gameState.bonusTaskXp += 15;
+        showPopup('info', 'Escudo Equipado', 'Sua próxima missão diária dará +15 XP bônus de partida.');
+    } else if (item === 'guildContract') {
+        gameState.discountXpPercent += 5;
+        showPopup('success', 'Contrato Assinado', 'O custo de XP para subir de nível reduziu em +5% permanentemente!');
+    } else if (item === 'coffeeBuff') {
+        gameState.nextTaskBonusCoins += 25;
+        showPopup('info', 'Energia Pura ☕', 'Foco total! Sua próxima missão concederá +25 moedas bônus.');
     }
     updateUI();
     await saveGameProgress();
 }
 
-document.getElementById('btn-buy-xp').addEventListener('click', () => buyItem('doubleXp', 50));
-document.getElementById('btn-buy-time').addEventListener('click', () => buyItem('extraTime', 30));
-document.getElementById('btn-buy-elixir').addEventListener('click', () => buyItem('elixirXp', 40));
-document.getElementById('btn-buy-scroll').addEventListener('click', () => buyItem('scrollBonus', 120));
-
-// RESET DO HISTÓRICO
 document.getElementById('btn-clear-history').addEventListener('click', async () => {
     gameState.history = {};
     updateUI();
@@ -349,12 +409,10 @@ document.getElementById('btn-clear-history').addEventListener('click', async () 
     showPopup('info', 'Histórico Limpo', 'Seu livro de registros passados foi zerado.');
 });
 
-// CONTADORES E RELÓGIOS DE BRASÍLIA
 function updateCountdown() {
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Sao_Paulo',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     });
     
     const parts = formatter.formatToParts(now);
@@ -376,6 +434,7 @@ function updateCountdown() {
 
     const pad = (num) => String(num).padStart(2, '0');
     document.getElementById('reset-timer').innerText = `⏳ ${pad(displayHrs)}h ${pad(displayMins)}m ${pad(displaySecs)}s`;
+    document.getElementById('shop-timer').innerText = `🔄 Nova Loja em: ${pad(displayHrs)}h`;
 }
 
 async function checkDailyReset() {
@@ -386,13 +445,16 @@ async function checkDailyReset() {
         gameState.tasks.forEach(t => t.completed = false);
         gameState.extraHours = 0; 
         gameState.lastResetDate = dataBrasilia;
+        
+        // MUDANÇA DA LOJA: Sorteia novos 5 itens ao virar o dia!
+        generateDailyShopRotation(); 
+
         updateUI();
         await saveGameProgress();
-        showPopup('info', 'Novo Dia!', 'Suas missões diárias recomeçaram.');
+        showPopup('info', 'Dia Atualizado!', 'As missões e os itens do Mercado Diário mudaram!');
     }
 }
 
-// INICIALIZADOR DO PRODUTO
 window.addEventListener('DOMContentLoaded', () => {
     updateAuthUI();
     let progress = 0;
